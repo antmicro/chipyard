@@ -3,7 +3,7 @@
 export HOME="${HOME:-/root}"
 
 CONDA_INSTALL_PREFIX=/opt/conda
-CONDA_INSTALLER_VERSION=23.1.0-1
+CONDA_INSTALLER_VERSION=23.11.0-0
 CONDA_INSTALLER="https://github.com/conda-forge/miniforge/releases/download/${CONDA_INSTALLER_VERSION}/Miniforge3-${CONDA_INSTALLER_VERSION}-Linux-x86_64.sh"
 CONDA_CMD="conda" # some installers install mamba or micromamba
 
@@ -90,13 +90,14 @@ if [[ ! -r /etc/os-release ]]; then
 fi
 
 OS_FLAVOR=$(grep '^ID=' /etc/os-release | awk -F= '{print $2}' | tr -d '"')
-OS_VERSION=$(grep '^VERSION_ID=' /etc/os-release | awk -F= '{print $2}' | tr -d '"')
 
 # platform-specific setup
 case "$OS_FLAVOR" in
     ubuntu)
         ;;
     centos)
+        ;;
+    debian)
         ;;
     *)
         echo "::ERROR:: Unknown OS flavor '$OS_FLAVOR'. Unable to do platform-specific setup."
@@ -145,31 +146,15 @@ else
     $SUDO bash ./install_conda.sh -b -p "$CONDA_INSTALL_PREFIX" $conda_install_extra
     rm ./install_conda.sh
 
-    # get most up-to-date conda version
-    "${DRY_RUN_ECHO[@]}" $SUDO "$CONDA_EXE" update $DRY_RUN_OPTION -y -n base -c conda-forge conda
-
-    # see https://conda-forge.org/docs/user/tipsandtricks.html#multiple-channels
-    # for more information on flexible channel_priority
-    "${DRY_RUN_ECHO[@]}" $SUDO "$CONDA_EXE" config --system --set channel_priority flexible
-    # By default, don't mess with people's PS1, I personally find it annoying
-    "${DRY_RUN_ECHO[@]}" $SUDO "$CONDA_EXE" config --system --set changeps1 false
-    # don't automatically activate the 'base' environment when initializing shells
-    "${DRY_RUN_ECHO[@]}" $SUDO "$CONDA_EXE" config --system --set auto_activate_base false
-    # automatically use the ucb-bar channel for specific packages https://anaconda.org/ucb-bar/repo
-    "${DRY_RUN_ECHO[@]}" $SUDO "$CONDA_EXE" config --system --add channels ucb-bar
-
-    # conda-build is a special case and must always be installed into the base environment
-    $SUDO "$CONDA_EXE" install $DRY_RUN_OPTION -y -n base conda-build
-
     # conda-libmamba-solver is a special case and must always be installed into the base environment
     # see https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community
     $SUDO "$CONDA_EXE" install $DRY_RUN_OPTION -y -n base conda-libmamba-solver
 
     # Use the fast solver by default
-    "${DRY_RUN_ECHO[@]}" $SUDO "$CONDA_EXE" config --system --set experimental_solver libmamba
+    "${DRY_RUN_ECHO[@]}" $SUDO "$CONDA_EXE" config --system --set solver libmamba
 
     # conda-lock is a special case and must always be installed into the base environment
-    $SUDO "$CONDA_EXE" install $DRY_RUN_OPTION -y -n base conda-lock=1.4
+    $SUDO "$CONDA_EXE" install $DRY_RUN_OPTION -y -n base conda-lock==1.4.0
 
     conda_init_extra_args=()
     if [[ "$INSTALL_TYPE" == system ]]; then
@@ -179,8 +164,13 @@ else
     fi
     $SUDO "${CONDA_EXE}" init $DRY_RUN_OPTION "${conda_init_extra_args[@]}" bash
 
+    # Add binary to path
+    PATH_STR="export PATH=\"${CONDA_INSTALL_PREFIX}/bin/:\$PATH\""
+    echo $PATH_STR >> ~/.bashrc
+
     if [[ $REINSTALL_CONDA -eq 1 ]]; then
         echo "::INFO:: Done reinstalling conda. Exiting"
         exit 0
     fi
+
 fi
