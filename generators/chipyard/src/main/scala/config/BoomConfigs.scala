@@ -68,3 +68,9 @@ class dmiMediumBoomCosimConfig extends Config(
   new boom.common.WithNMediumBooms(1) ++
   new chipyard.config.AbstractConfig)
 
+class SimBlockDeviceMegaBoomConfig extends Config(
+  new chipyard.harness.WithSimBlockDevice ++                     // drive block-device IOs with SimBlockDevice
+  new testchipip.WithBlockDevice ++                              // add block-device module to peripherybus
+  new boom.common.WithNMegaBooms(1) ++                           // mega boom config
+  new chipyard.config.WithSystemBusWidth(128) ++
+  new chipyard.config.AbstractConfig)
